@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const cors = require('cors');
 
 const app = express();
@@ -9,16 +8,13 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize database
-const db = new sqlite3.Database('./data/complex_db.sqlite', (err) => {
+const db = new sqlite3.Database('./data/ecommerce_db_v2.sqlite', (err) => {
   if (err) {
     console.error('Database connection error:', err.message);
   } else {
     console.log('Database connected successfully');
   }
 });
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'missing-key');
 
 // Cache for database schema
 let cachedSchema = null;
@@ -74,16 +70,28 @@ function executeQuery(query) {
   });
 }
 
-// Helper function to generate responses with Gemini
-async function generateWithGemini(prompt) {
+// Helper function to generate responses with Ollama
+async function generateWithOllama(prompt) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const response = await fetch('http://localhost:11434/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gemma:2b',
+        prompt: prompt,
+        stream: false,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama API request failed: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.response;
   } catch (error) {
-    console.error("Gemini Error Details:", error);
-    throw new Error(`Failed to generate response from Gemini: ${error.message}`);
+    console.error("Ollama Error Details:", error);
+    throw new Error(`Failed to generate response from Ollama: ${error.message}`);
   }
 }
 
@@ -125,8 +133,8 @@ app.post('/api/query', async (req, res) => {
     const schema = await getDatabaseSchema();
     console.log('Schema retrieved:', schema);
 
-    // Step 2: Generate SQL with Gemini
-    console.log('Generating SQL query with Gemini...');
+    // Step 2: Generate SQL with Ollama
+    console.log('Generating SQL query with Ollama...');
     const sqlPrompt = `
       You are a SQL expert. Given this database schema:
       ${schema}
@@ -134,10 +142,45 @@ app.post('/api/query', async (req, res) => {
       Generate a SQL query to answer: "${question}"
       Return ONLY the raw SQL query as a plain string, without any Markdown formatting (e.g., no \`\`\`sql or \`\`\`), comments, or additional text.
       Use lowercase for SQL functions (e.g., strftime, not STRFTIME).
-      Note: For order status, use 'complete' (not 'completed') to indicate successful transactions.
+      Note: For sales status, use 'shipped' to indicate completed transactions.
+      Handle inconsistencies in the schema, such as unnamed columns (e.g., col1 in items table for item name) or mismatched column names (e.g., custid in sales vs client_id in clients).
+      ONLY use the tables and columns specified in the schema above. Do NOT invent tables or columns. Here are some example queries:
+      
+      Example 1: To find the top clients by sales amount:
+      SELECT c.client_name, SUM(s.amt) AS total_spend
+      FROM clients c
+      JOIN sales s ON c.client_id = s.custid
+      WHERE s.date_of_sale LIKE '2023%'
+        AND s.status_code = 'shipped'
+      GROUP BY c.client_id, c.client_name
+      ORDER BY total_spend DESC
+      LIMIT 5
+      
+      Example 2: To find monthly sales trends for a category:
+      SELECT strftime('%Y-%m', s.date_of_sale) AS sales_month, SUM(s.amt) AS total_revenue
+      FROM sales s
+      JOIN sale_items si ON s.sale_id = si.sale_ref
+      JOIN items i ON si.item_ref = i.item_id
+      JOIN categories c ON i.category_id_ref = c.cat_id
+      WHERE s.date_of_sale LIKE '2023%'
+        AND (c.cat_name = 'Necklaces' OR c.cat_name = 'necklaces')
+        AND s.status_code = 'shipped'
+      GROUP BY sales_month
+      ORDER BY sales_month
+      
+      Example 3: To find items with the highest return rate:
+      SELECT i.col1 AS item_name,
+             SUM(CASE WHEN s.status_code = 'returned' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS return_rate
+      FROM sales s
+      JOIN sale_items si ON s.sale_id = si.sale_ref
+      JOIN items i ON si.item_ref = i.item_id
+      WHERE s.date_of_sale LIKE '2023%'
+      GROUP BY i.item_id, i.col1
+      ORDER BY return_rate DESC
+      LIMIT 5
     `;
     
-    const sqlQuery = await generateWithGemini(sqlPrompt);
+    const sqlQuery = await generateWithOllama(sqlPrompt);
     console.log('Generated SQL query (before cleaning):', sqlQuery);
     const cleanedSqlQuery = cleanSqlQuery(sqlQuery);
     console.log('Cleaned SQL query:', cleanedSqlQuery);
@@ -147,8 +190,8 @@ app.post('/api/query', async (req, res) => {
     const data = await executeQuery(cleanedSqlQuery);
     console.log('Query results:', data);
 
-    // Step 4: Generate explanation with Gemini
-    console.log('Generating explanation with Gemini...');
+    // Step 4: Generate explanation with Ollama
+    console.log('Generating explanation with Ollama...');
     const explanationPrompt = `
       Question: ${question}
       SQL Query: ${cleanedSqlQuery}
@@ -156,9 +199,10 @@ app.post('/api/query', async (req, res) => {
       
       Explain these results in business terms in 1 short paragraph (50-100 words).
       Highlight key insights and trends.
+      Account for potential data issues (e.g., missing values, outliers) in the explanation.
     `;
     
-    const explanation = await generateWithGemini(explanationPrompt);
+    const explanation = await generateWithOllama(explanationPrompt);
     console.log('Explanation generated:', explanation);
 
     // Step 5: Send response
