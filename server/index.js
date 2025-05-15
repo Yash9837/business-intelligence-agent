@@ -8,44 +8,83 @@ const fs = require('fs');
 const axios = require('axios');
 const path = require('path');
 
-// Ensure the database directory exists
+const app = express();
+const upload = multer({ dest: 'uploads/' });
+
+// Ensure the database directory exists for default database
 const dbDir = '/opt/render/db';
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
   console.log(`Created database directory: ${dbDir}`);
 }
 
-const app = express();
-const upload = multer({ dest: 'uploads/' });
+// Custom middleware to set CORS headers for all responses, including errors
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://intelligence-agent.netlify.app');
+  res.header('Access-Control-Allow-Methods', 'GET, POST');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
-app.use(express.json());
 app.use(cors({
   origin: 'https://intelligence-agent.netlify.app',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type'],
 }));
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+app.use(express.json());
 
 // Initialize default database on Render disk
-const defaultDb = new sqlite3.Database(path.join(dbDir, 'ecommerce_db_v2.sqlite'), (err) => {
-  if (err) {
-    console.error('Default database connection error:', err.message);
-  } else {
-    console.log('Default database connected successfully');
-  }
-});
+let defaultDb;
+try {
+  defaultDb = new sqlite3.Database(path.join(dbDir, 'ecommerce_db_v2.sqlite'), (err) => {
+    if (err) {
+      console.error('Default database connection error:', err.message);
+    } else {
+      console.log('Default database connected successfully');
+    }
+  });
+} catch (error) {
+  console.error('Failed to initialize default database:', error.message);
+  process.exit(1);
+}
 
-// Temporary database for user-uploaded data
-let tempDb = null;
+// Initialize temporary database for user-uploaded data (once, at startup)
+let tempDb;
+try {
+  tempDb = new sqlite3.Database(':memory:', (err) => {
+    if (err) {
+      console.error('Temp database connection error:', err.message);
+    } else {
+      console.log('Temp database initialized successfully');
+    }
+  });
+} catch (error) {
+  console.error('Failed to initialize temp database:', error.message);
+  process.exit(1);
+}
 
 // Cache for database schema
 let cachedSchema = null;
 
+// Flag to track if user data has been uploaded
+let isUserDataUploaded = false;
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
+
 // Helper function to get the active database
 function getActiveDb(useUserData) {
-  return useUserData && tempDb ? tempDb : defaultDb;
+  if (useUserData && tempDb && isUserDataUploaded) {
+    return tempDb;
+  }
+  if (!defaultDb) {
+    throw new Error('Default database is not initialized');
+  }
+  return defaultDb;
 }
 
 // Helper function to get database schema
@@ -91,6 +130,9 @@ function executeQuery(query, useUserData) {
   const db = getActiveDb(useUserData);
   return new Promise((resolve, reject) => {
     console.log('Executing query:', query);
+    if (useUserData && !isUserDataUploaded) {
+      return reject(new Error('No user data uploaded. Please upload a CSV file first.'));
+    }
     db.all(query, [], (err, rows) => {
       if (err) {
         console.error('SQL execution error:', err.message);
@@ -116,7 +158,7 @@ async function generateWithGemini(prompt) {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000, // 30-second timeout
+      timeout: 30000,
     });
 
     if (!response.data || !response.data.candidates || !response.data.candidates[0].content.parts[0].text) {
@@ -126,7 +168,7 @@ async function generateWithGemini(prompt) {
     return response.data.candidates[0].content.parts[0].text;
   } catch (error) {
     if (error.response && error.response.status === 429) {
-      throw new Error('Gemini API rate limit exceeded. Please wait and try again or upgrade your plan.');
+      throw new Error('Gemini API rate limit exceeded. Please wait 60 seconds and try again or upgrade your plan.');
     } else if (error.response && error.response.status === 401) {
       throw new Error('Invalid Gemini API key. Please check your GEMINI_API_KEY environment variable.');
     } else if (error.code === 'ECONNABORTED') {
@@ -187,15 +229,15 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'CSV file is empty' });
     }
 
-    if (tempDb) {
-      tempDb.close();
-    }
-
-    tempDb = new sqlite3.Database(':memory:', (err) => {
-      if (err) {
-        console.error('Temp database connection error:', err.message);
-        return res.status(500).json({ error: 'Failed to create temp database' });
-      }
+    // Drop existing user_data table if it exists
+    await new Promise((resolve, reject) => {
+      tempDb.run('DROP TABLE IF EXISTS user_data', (err) => {
+        if (err) {
+          console.error('Error dropping user_data table:', err.message);
+          return reject(err);
+        }
+        resolve();
+      });
     });
 
     const headers = Object.keys(records[0]);
@@ -206,8 +248,11 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
     const createTableQuery = `CREATE TABLE user_data (${columns})`;
     await new Promise((resolve, reject) => {
       tempDb.run(createTableQuery, (err) => {
-        if (err) reject(err);
-        else resolve();
+        if (err) {
+          console.error('Error creating user_data table:', err.message);
+          return reject(err);
+        }
+        resolve();
       });
     });
 
@@ -217,12 +262,16 @@ app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
       const values = headers.map(header => record[header] || null);
       await new Promise((resolve, reject) => {
         tempDb.run(insertQuery, values, (err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            console.error('Error inserting data into user_data:', err.message);
+            return reject(err);
+          }
+          resolve();
         });
       });
     }
 
+    isUserDataUploaded = true;
     const schema = await getDatabaseSchema(true);
     console.log('Schema of uploaded dataset:', schema);
 
@@ -337,15 +386,31 @@ app.post('/api/query', async (req, res) => {
   }
 });
 
+// Basic health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
+
 // Start server
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
 // Close databases on shutdown
 process.on('SIGINT', () => {
-  if (tempDb) tempDb.close();
-  defaultDb.close();
+  console.log('Shutting down server...');
+  if (tempDb) {
+    tempDb.close((err) => {
+      if (err) console.error('Error closing tempDb:', err.message);
+      else console.log('Temp database closed');
+    });
+  }
+  if (defaultDb) {
+    defaultDb.close((err) => {
+      if (err) console.error('Error closing defaultDb:', err.message);
+      else console.log('Default database closed');
+    });
+  }
   process.exit();
 });
