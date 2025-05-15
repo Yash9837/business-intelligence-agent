@@ -41,7 +41,7 @@ h1, h2, h3, h4, h5, h6 {
 
 pre {
   background: #1e293b;
-  padding: 1.5rem;
+  padding: 1rem;
   border-radius: 0.5rem;
   color: #94a3b8;
   overflow-x: auto;
@@ -52,10 +52,11 @@ table {
   border-collapse: collapse;
   background: #1e293b;
   border-radius: 0.5rem;
+  overflow: hidden;
 }
 
 th, td {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem;
   text-align: left;
   border-bottom: 1px solid #334155;
 }
@@ -75,36 +76,53 @@ td {
   padding: 20px;
 }
 
-/* SPACING FIXES FOR PRODUCTION ENVIRONMENT */
+/* @media (max-width: 768px) {
+  .dashboard-container {
+    padding: 10px;
+  }
+} */
+
+/* ==========================================
+   SPACING FIXES FOR PRODUCTION ENVIRONMENT 
+   ========================================== */
+
 @layer utilities {
+  /* Ensure no extra spacing is added to the body and html elements */
   html, body {
     @apply m-0 p-0 overflow-x-hidden min-h-screen;
   }
 
+  /* Fix header spacing and ensure consistent height */
   nav, .navbar, header {
     @apply mb-0 py-4;
   }
 
+  /* Fix the spacing between main content sections */
   main, .main-content {
     @apply py-0 my-0;
   }
 
+  /* Adjust welcome section spacing */
   .welcome-section, section:first-of-type {
     @apply pt-8 pb-8;
   }
 
+  /* Fix spacing for content containers */
   .container {
     @apply mx-auto px-4 overflow-visible;
   }
 
+  /* Prevent potential flex or grid layout issues that cause unexpected spacing */
   .row, .grid {
     @apply flex flex-wrap justify-center;
   }
 
+  /* Ensure feature cards have consistent spacing */
   .card, .feature-card {
     @apply mb-6;
   }
 
+  /* Force removal of any unexpected margin in the main hero/welcome section */
   .hero-section h1, .welcome-section h1, 
   .hero-section h2, .welcome-section h2 {
     @apply mt-0 mb-4;
@@ -119,6 +137,7 @@ td {
   }
 }
 
+/* Additional fixes for potential spacing issues */
 section {
   margin: 0;
   padding: 2rem 0;
@@ -134,7 +153,9 @@ section {
   margin-bottom: 2rem;
 }
 
-/* Debug helper */
+/* Debug helper - uncomment to visualize layout issues */
+/*
 .debug-layout * {
   border: 1px solid red;
 }
+*/

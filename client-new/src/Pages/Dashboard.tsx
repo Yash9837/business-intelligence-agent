@@ -386,18 +386,18 @@ const Dashboard: React.FC = () => {
 
             {/* Query Results */}
             {result && (
-  <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 hover:border-blue-400 transition duration-300 py-0">
-    <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
-      <h2 className="text-lg font-semibold text-white flex items-center">
-        <TrendingUp className="h-6 w-6 mr-3 text-blue-400" />
-        Query Results
-      </h2>
-    </div>
-    <div className="p-8">
-      <QueryResult result={result} />
-    </div>
-  </section>
-)}
+              <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0">
+                <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+                  <h2 className="text-lg font-semibold text-white flex items-center">
+                    <TrendingUp className="h-6 w-6 mr-3 text-blue-400" />
+                    Query Results
+                  </h2>
+                </div>
+                <div className="p-8">
+                  <QueryResult result={result} />
+                </div>
+              </section>
+            )}
 
             {/* Loading State */}
             {loading && !result && (
