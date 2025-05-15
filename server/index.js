@@ -6,6 +6,14 @@ const multer = require('multer');
 const { parse } = require('csv-parse');
 const fs = require('fs');
 const axios = require('axios');
+const path = require('path');
+
+// Ensure the database directory exists
+const dbDir = '/opt/render/db';
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+  console.log(`Created database directory: ${dbDir}`);
+}
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
@@ -21,7 +29,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
 
 // Initialize default database on Render disk
-const defaultDb = new sqlite3.Database('/opt/render/db/ecommerce_db_v2.sqlite', (err) => {
+const defaultDb = new sqlite3.Database(path.join(dbDir, 'ecommerce_db_v2.sqlite'), (err) => {
   if (err) {
     console.error('Default database connection error:', err.message);
   } else {
