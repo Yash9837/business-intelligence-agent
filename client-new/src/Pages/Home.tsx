@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { TrendingUp, PieChart, Zap, ChevronRight, Database, LineChart, Award } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
-const Home = () => {
+const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       <Navbar />

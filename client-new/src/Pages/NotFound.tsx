@@ -1,8 +1,7 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
-const NotFound = () => {
+const NotFound: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900">
       <Navbar />

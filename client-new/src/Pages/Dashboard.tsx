@@ -1,36 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Upload, FileText, Database, Send, AlertCircle, ChevronDown, Info, TrendingUp, PieChart, BarChart2, LineChart } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import QueryResult from '../components/QueryResults';
 
-const Dashboard = () => {
-  const [file, setFile] = useState(null);
-  const [useUploadedData, setUseUploadedData] = useState(false);
-  const [question, setQuestion] = useState('');
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [uploadLoading, setUploadLoading] = useState(false);
-  const [showDatasetInfo, setShowDatasetInfo] = useState(false);
-  const [pastQueries, setPastQueries] = useState([]);
-  const [notification, setNotification] = useState(null);
+interface Notification {
+  message: string;
+  type: 'success' | 'error';
+}
 
-  // Handle file upload
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
+interface PastQuery {
+  question: string;
+  timestamp: string;
+}
+
+const Dashboard: React.FC = () => {
+  const [file, setFile] = useState<File | null>(null);
+  const [useUploadedData, setUseUploadedData] = useState<boolean>(false);
+  const [question, setQuestion] = useState<string>('');
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [uploadLoading, setUploadLoading] = useState<boolean>(false);
+  const [showDatasetInfo, setShowDatasetInfo] = useState<boolean>(false);
+  const [pastQueries, setPastQueries] = useState<PastQuery[]>([]);
+  const [notification, setNotification] = useState<Notification | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setUseUploadedData(true);
     }
   };
 
-  // Show notification
-  const showNotification = (message, type = 'success') => {
+  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleUpload = async (e) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
       setError('Please select a file to upload');
@@ -41,10 +49,9 @@ const Dashboard = () => {
     setError(null);
 
     try {
-      // Create form data for file upload
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const response = await fetch('http://localhost:3001/api/upload-csv', {
         method: 'POST',
         body: file,
@@ -61,14 +68,14 @@ const Dashboard = () => {
         setError(data.error || 'Failed to upload CSV');
       }
     } catch (err) {
-      setError('Error uploading CSV: ' + err.message);
+      const error = err as Error;
+      setError('Error uploading CSV: ' + error.message);
     } finally {
       setUploadLoading(false);
     }
   };
 
-  // Handle query submission
-  const handleQuerySubmit = async (e) => {
+  const handleQuerySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) {
       setError('Please enter a question');
@@ -94,28 +101,26 @@ const Dashboard = () => {
       const data = await response.json();
       if (response.ok) {
         setResult(data);
-        // Add to past queries
         setPastQueries(prev => {
           const newQueries = [{ question, timestamp: new Date().toISOString() }, ...prev];
-          return newQueries.slice(0, 5); // Keep only last 5 queries
+          return newQueries.slice(0, 5);
         });
       } else {
         setError(data.error || 'Failed to fetch query results');
       }
     } catch (err) {
-      setError('Error fetching query results: ' + err.message);
+      const error = err as Error;
+      setError('Error fetching query results: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle example query click
-  const handleExampleClick = (exampleQuestion) => {
+  const handleExampleClick = (exampleQuestion: string) => {
     setQuestion(exampleQuestion);
   };
 
-  // Example queries based on data source
-  const getExampleQueries = () => {
+  const getExampleQueries = (): string[] => {
     if (useUploadedData) {
       return [
         "What are the top items in my dataset?",
@@ -134,8 +139,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       <Navbar />
-
-      {/* Notification */}
       {notification && (
         <div className={`fixed top-20 right-4 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-0 z-50 ${
           notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
@@ -145,11 +148,10 @@ const Dashboard = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Page Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500">
-              Data Analysis Dashboard
+              Silver Insights Dashboard
             </h1>
             <p className="text-gray-300 mt-1">Ask questions and discover insights from your data</p>
           </div>
@@ -171,11 +173,8 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Main Content - Two Column Layout for larger screens */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Upload and Controls */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Dataset Upload Card */}
             <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
               <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <div className="flex justify-between items-center">
@@ -249,7 +248,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Quick Stats Card */}
             <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
               <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
@@ -269,7 +267,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Example Queries Card */}
             <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
               <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
@@ -293,7 +290,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Recent Queries Card */}
             {pastQueries.length > 0 && (
               <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
                 <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
@@ -320,9 +316,7 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Right Column - Query and Results */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Query Input Card */}
             <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
               <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
@@ -359,7 +353,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-900/30 border border-red-500 text-white rounded-lg p-4 flex items-start">
                 <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
@@ -367,7 +360,6 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Query Results */}
             {result && (
               <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
                 <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
@@ -382,7 +374,6 @@ const Dashboard = () => {
               </div>
             )}
 
-            {/* Loading State */}
             {loading && !result && (
               <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
                 <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">

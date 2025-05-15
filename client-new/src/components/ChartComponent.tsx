@@ -9,8 +9,9 @@ import {
   PointElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
 } from 'chart.js';
+import type { ChartData, ChartOptions } from 'chart.js';
 
 ChartJS.register(
   CategoryScale,
@@ -23,11 +24,17 @@ ChartJS.register(
   Legend
 );
 
-const ChartComponent = ({ type, data, options }) => {
+interface ChartComponentProps {
+  type: 'bar' | 'line';
+  data: ChartData<'bar' | 'line'>;
+  options: ChartOptions<'bar' | 'line'>;
+}
+
+const ChartComponent: React.FC<ChartComponentProps> = ({ type, data, options }) => {
   if (type === 'bar') {
-    return <Bar data={data} options={options} />;
+    return <Bar data={data as ChartData<'bar'>} options={options} />;
   } else if (type === 'line') {
-    return <Line data={data} options={options} />;
+    return <Line data={data as ChartData<'line'>} options={options} />;
   }
   return null;
 };

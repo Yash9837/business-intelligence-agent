@@ -1,11 +1,12 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 
-function Navbar() {
+const Navbar: React.FC = () => {
   return (
     <nav className="bg-gray-800 p-4 shadow-lg">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-blue-300">
-          Insights.AI
+          Silver Insights
         </Link>
         <div className="space-x-4">
           <Link to="/" className="text-gray-300 hover:text-blue-300">
@@ -18,6 +19,6 @@ function Navbar() {
       </div>
     </nav>
   );
-}
+};
 
 export default Navbar;

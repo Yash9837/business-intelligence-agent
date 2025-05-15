@@ -1,7 +1,20 @@
 import React from 'react';
 import ChartComponent from './ChartComponent';
+import { ChartData, ChartOptions } from 'chart.js';
 
-const QueryResult = ({ result }) => {
+interface QueryResultProps {
+  result: {
+    question: string;
+    sqlQuery: string;
+    data: any[];
+    visualizationType: string;
+    xAxisLabel?: string;
+    yAxisLabel?: string;
+    explanation: string;
+  } | null;
+}
+
+const QueryResult: React.FC<QueryResultProps> = ({ result }) => {
   if (!result || !result.data) {
     return <div className="text-gray-400">No results to display</div>;
   }
@@ -9,8 +22,8 @@ const QueryResult = ({ result }) => {
   const { data, visualizationType, xAxisLabel, yAxisLabel, explanation } = result;
 
   // Prepare chart data
-  let chartData = null;
-  let chartOptions = {};
+  let chartData: ChartData<'bar' | 'line'> | null = null;
+  let chartOptions: ChartOptions<'bar' | 'line'> = {};
 
   if (visualizationType === 'bar' || visualizationType === 'line') {
     const labels = data.map(item => item[Object.keys(item)[0]]);
@@ -88,7 +101,7 @@ const QueryResult = ({ result }) => {
               {data.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   {Object.values(row).map((value, colIndex) => (
-                    <td key={colIndex}>{value}</td>
+                    <td key={colIndex}>{String(value)}</td>
                   ))}
                 </tr>
               ))}
@@ -97,7 +110,7 @@ const QueryResult = ({ result }) => {
         </div>
       ) : (
         <div className="bg-gray-700 p-4 rounded-md">
-          <ChartComponent type={visualizationType} data={chartData} options={chartOptions} />
+          <ChartComponent type={visualizationType as 'bar' | 'line'} data={chartData} options={chartOptions} />
         </div>
       )}
 
