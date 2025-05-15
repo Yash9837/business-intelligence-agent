@@ -148,47 +148,54 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500">
-              Silver Insights Dashboard
-            </h1>
-            <p className="text-gray-300 mt-1">Ask questions and discover insights from your data</p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <div className="bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm inline-flex shadow-md">
-              <button
-                className={`px-4 py-2 rounded-md transition duration-200 ${
-                  !useUploadedData
-                    ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
-                    : 'text-gray-300 hover:text-white'
-                }`}
-                onClick={() => setUseUploadedData(false)}
-              >
-                Sample Data
-              </button>
-              <button
-                className={`px-4 py-2 rounded-md transition duration-200 ${
-                  useUploadedData
-                    ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
-                    : 'text-gray-300 hover:text-white'
-                }`}
-                onClick={() => setUseUploadedData(true)}
-              >
-                My Data
-              </button>
+      {/* Main content container with new padding */}
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Header section with new margin */}
+        <section className="welcome-section mb-12">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div>
+              <h1 className="welcome-text text-4xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500">
+                Silver Insights Dashboard
+              </h1>
+              <p className="text-gray-300">Ask questions and discover insights from your data</p>
+            </div>
+            <div className="sm:mt-0">
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm inline-flex shadow-md">
+                <button
+                  className={`px-4 py-2 rounded-md transition duration-200 ${
+                    !useUploadedData
+                      ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                  onClick={() => setUseUploadedData(false)}
+                >
+                  Sample Data
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-md transition duration-200 ${
+                    useUploadedData
+                      ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                  onClick={() => setUseUploadedData(true)}
+                >
+                  My Data
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-              <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+        {/* Grid layout with new gap and column sizing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 sm:gap-8 lg:gap-12">
+          {/* Sidebar: Adjusted column span */}
+          <aside className="sm:col-span-1 lg:col-span-2 space-y-8">
+            {/* Data Source Card */}
+            <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0">
+              <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-white flex items-center">
-                    <FileText className="h-5 w-5 mr-2 text-blue-400" />
+                    <FileText className="h-6 w-6 mr-3 text-blue-400" />
                     Data Source
                   </h2>
                   <button
@@ -196,30 +203,30 @@ const Dashboard: React.FC = () => {
                     className="text-gray-400 hover:text-white transition"
                   >
                     <ChevronDown
-                      className={`h-5 w-5 transform ${showDatasetInfo ? 'rotate-180' : ''} transition-transform`}
+                      className={`h-6 w-6 transform ${showDatasetInfo ? 'rotate-180' : ''} transition-transform`}
                     />
                   </button>
                 </div>
               </div>
 
               {showDatasetInfo && (
-                <div className="px-5 py-3 bg-gray-750 border-b border-gray-700 text-sm text-gray-300">
+                <div className="px-8 py-6 bg-gray-750 border-b border-gray-700 text-sm text-gray-300">
                   <p>Upload a CSV file to analyze your own data or use our sample dataset to explore the platform's capabilities.</p>
                 </div>
               )}
 
-              <div className="p-5">
-                <form onSubmit={handleUpload} className="space-y-4">
-                  <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-blue-400 transition cursor-pointer">
+              <div className="p-8">
+                <form onSubmit={handleUpload} className="space-y-6">
+                  <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center hover:border-blue-400 transition cursor-pointer">
                     <label className="w-full h-full cursor-pointer">
-                      <div className="flex flex-col items-center justify-center py-2">
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                      <div className="flex flex-col items-center justify-center py-3">
+                        <Upload className="h-10 w-10 text-gray-400 mb-3" />
                         {file ? (
-                          <span className="text-blue-400 font-medium">{file.name}</span>
+                          <span className="text-blue-400 font-medium text-lg">{file.name}</span>
                         ) : (
                           <>
-                            <span className="text-sm font-medium text-gray-300">Drop your CSV file here or</span>
-                            <span className="text-blue-400 font-medium">browse</span>
+                            <span className="text-base font-medium text-gray-300">Drop your CSV file here or</span>
+                            <span className="text-blue-400 font-medium text-lg">browse</span>
                           </>
                         )}
                         <input
@@ -233,12 +240,12 @@ const Dashboard: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center space-x-2 text-sm text-gray-300">
+                    <label className="flex items-center space-x-3 text-base text-gray-300">
                       <input
                         type="checkbox"
                         checked={useUploadedData}
                         onChange={(e) => setUseUploadedData(e.target.checked)}
-                        className="h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-600 rounded"
+                        className="h-5 w-5 text-blue-500 focus:ring-blue-500 border-gray-600 rounded"
                       />
                       <span>Use uploaded dataset</span>
                     </label>
@@ -246,7 +253,7 @@ const Dashboard: React.FC = () => {
                     <button
                       type="submit"
                       disabled={uploadLoading || !file}
-                      className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+                      className={`px-6 py-3 rounded-md text-base font-medium text-white ${
                         uploadLoading || !file
                           ? 'bg-gray-600 cursor-not-allowed'
                           : 'bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600'
@@ -257,148 +264,156 @@ const Dashboard: React.FC = () => {
                   </div>
                 </form>
               </div>
-            </div>
+            </section>
 
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-              <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+            {/* Quick Stats Card */}
+            <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0">
+              <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
-                  <PieChart className="h-5 w-5 mr-2 text-blue-400" />
+                  <PieChart className="h-6 w-6 mr-3 text-blue-400" />
                   Quick Stats
                 </h2>
               </div>
-              <div className="p-5 grid grid-cols-2 gap-4">
-                <div className="bg-gray-750 rounded-lg p-4 hover:bg-gray-700 transition duration-300">
-                  <p className="text-gray-400 text-sm">Data Source</p>
-                  <p className="text-lg font-medium">{useUploadedData ? (file ? file.name : 'No file') : 'Sample Data'}</p>
+              <div className="p-8 grid grid-cols-2 gap-6">
+                <div className="bg-gray-750 rounded-lg p-6 hover:bg-gray-700 transition duration-300">
+                  <p className="text-gray-400 text-base mb-2">Data Source</p>
+                  <p className="text-xl font-medium">{useUploadedData ? (file ? file.name : 'No file') : 'Sample Data'}</p>
                 </div>
-                <div className="bg-gray-750 rounded-lg p-4 hover:bg-gray-700 transition duration-300">
-                  <p className="text-gray-400 text-sm">Queries Run</p>
-                  <p className="text-lg font-medium">{pastQueries.length}</p>
+                <div className="bg-gray-750 rounded-lg p-6 hover:bg-gray-700 transition duration-300">
+                  <p className="text-gray-400 text-base mb-2">Queries Run</p>
+                  <p className="text-xl font-medium">{pastQueries.length}</p>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-              <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+            {/* Example Queries Card */}
+            <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0 max-h-[400px] overflow-y-auto">
+              <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
-                  <Database className="h-5 w-5 mr-2 text-blue-400" />
+                  <Database className="h-6 w-6 mr-3 text-blue-400" />
                   Example Queries
                 </h2>
               </div>
-              <div className="p-5">
-                <div className="space-y-2">
+              <div className="p-8">
+                <div className="space-y-4">
                   {getExampleQueries().map((exampleQuery, index) => (
                     <button
                       key={index}
                       onClick={() => handleExampleClick(exampleQuery)}
-                      className="w-full text-left p-3 bg-gray-750 hover:bg-gray-700 rounded-lg transition duration-200 text-gray-300 hover:text-white flex items-center"
+                      className="w-full text-left p-4 bg-gray-750 hover:bg-gray-700 rounded-lg transition duration-200 text-gray-300 hover:text-white flex items-center text-base"
                     >
-                      <Send className="h-4 w-4 mr-2 text-blue-400" />
+                      <Send className="h-5 w-5 mr-3 text-blue-400" />
                       <span>{exampleQuery}</span>
                     </button>
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
 
+            {/* Recent Queries Card */}
             {pastQueries.length > 0 && (
-              <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-                <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+              <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0 max-h-[400px] overflow-y-auto">
+                <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                   <h2 className="text-lg font-semibold text-white flex items-center">
-                    <LineChart className="h-5 w-5 mr-2 text-blue-400" />
+                    <LineChart className="h-6 w-6 mr-3 text-blue-400" />
                     Recent Queries
                   </h2>
                 </div>
-                <div className="p-5">
-                  <div className="space-y-2">
+                <div className="p-8">
+                  <div className="space-y-4">
                     {pastQueries.map((query, index) => (
                       <button
                         key={index}
                         onClick={() => handleExampleClick(query.question)}
-                        className="w-full text-left p-3 bg-gray-750 hover:bg-gray-700 rounded-lg transition duration-200 text-gray-300 hover:text-white flex items-center"
+                        className="w-full text-left p-4 bg-gray-750 hover:bg-gray-700 rounded-lg transition duration-200 text-gray-300 hover:text-white flex items-center text-base"
                       >
-                        <BarChart2 className="h-4 w-4 mr-2 text-blue-400" />
+                        <BarChart2 className="h-5 w-5 mr-3 text-blue-400" />
                         <span className="truncate">{query.question}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-              </div>
+              </section>
             )}
-          </div>
+          </aside>
 
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-              <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+          {/* Main Content: Adjusted column span */}
+          <div className="sm:col-span-1 lg:col-span-3 space-y-8">
+            {/* Ask a Question Card */}
+            <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0">
+              <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                 <h2 className="text-lg font-semibold text-white flex items-center">
-                  <Send className="h-5 w-5 mr-2 text-blue-400" />
+                  <Send className="h-6 w-6 mr-3 text-blue-400" />
                   Ask a Question
                 </h2>
               </div>
-              <div className="p-5">
-                <form onSubmit={handleQuerySubmit} className="space-y-4">
+              <div className="p-8">
+                <form onSubmit={handleQuerySubmit} className="space-y-6">
                   <div className="relative">
                     <input
                       type="text"
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
                       placeholder="e.g., Who are our top 5 clients by total sales?"
-                      className="w-full p-4 pr-12 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full p-4 pr-14 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
                     />
                     <button
                       type="submit"
                       disabled={loading}
-                      className={`absolute right-2 top-2 p-2 rounded-md ${
+                      className={`absolute right-3 top-3 p-2 rounded-md ${
                         loading ? 'bg-gray-600' : 'bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-600 hover:to-emerald-600'
                       } transition shadow-md`}
                     >
-                      <Send className="h-5 w-5 text-white" />
+                      <Send className="h-6 w-6 text-white" />
                     </button>
                   </div>
 
-                  <div className="flex items-center text-sm text-gray-400">
-                    <Info className="h-4 w-4 mr-1" />
+                  <div className="flex items-center text-base text-gray-400">
+                    <Info className="h-5 w-5 mr-2" />
                     <span>Ask in natural language about your data</span>
                   </div>
                 </form>
               </div>
-            </div>
+            </section>
 
+            {/* Error Message */}
             {error && (
-              <div className="bg-red-900/30 border border-red-500 text-white rounded-lg p-4 flex items-start">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
-                <p>{error}</p>
+              <div className="bg-red-900/30 border border-red-500 text-white rounded-lg p-8 flex items-start">
+                <AlertCircle className="h-6 w-6 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
+                <p className="text-base">{error}</p>
               </div>
             )}
 
+            {/* Query Results */}
             {result && (
-              <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300">
-                <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+              <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden hover:border-blue-400 transition duration-300 py-0">
+                <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                   <h2 className="text-lg font-semibold text-white flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2 text-blue-400" />
+                    <TrendingUp className="h-6 w-6 mr-3 text-blue-400" />
                     Query Results
                   </h2>
                 </div>
-                <div className="p-5">
+                <div className="p-8">
                   <QueryResult result={result} />
                 </div>
-              </div>
+              </section>
             )}
 
+            {/* Loading State */}
             {loading && !result && (
-              <div className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden">
-                <div className="p-5 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
+              <section className="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden py-0">
+                <div className="p-8 border-b border-gray-700 bg-gradient-to-r from-gray-800 to-gray-700">
                   <h2 className="text-lg font-semibold text-white">Processing Query</h2>
                 </div>
                 <div className="p-16 flex flex-col items-center justify-center">
-                  <div className="w-16 h-16 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-                  <p className="text-gray-400">Analyzing your data...</p>
+                  <div className="w-20 h-20 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+                  <p className="text-gray-400 text-lg">Analyzing your data...</p>
                 </div>
-              </div>
+              </section>
             )}
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
