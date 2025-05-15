@@ -2,29 +2,40 @@ require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const { parse } = require('csv-parse');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize database
-const db = new sqlite3.Database('./data/ecommerce_db_v2.sqlite', (err) => {
+// Initialize default database
+const defaultDb = new sqlite3.Database('./data/ecommerce_db_v2.sqlite', (err) => {
   if (err) {
-    console.error('Database connection error:', err.message);
+    console.error('Default database connection error:', err.message);
   } else {
-    console.log('Database connected successfully');
+    console.log('Default database connected successfully');
   }
 });
+
+// Temporary database for user-uploaded data
+let tempDb = null;
 
 // Cache for database schema
 let cachedSchema = null;
 
+// Helper function to get the active database
+function getActiveDb(useUserData) {
+  return useUserData && tempDb ? tempDb : defaultDb;
+}
+
 // Helper function to get database schema
-async function getDatabaseSchema() {
-  if (cachedSchema) {
+async function getDatabaseSchema(useUserData) {
+  if (cachedSchema && !useUserData) {
     console.log('Using cached schema');
     return cachedSchema;
   }
+  const db = getActiveDb(useUserData);
   return new Promise((resolve, reject) => {
     db.all("SELECT name FROM sqlite_master WHERE type='table'", [], (err, tables) => {
       if (err) {
@@ -48,7 +59,7 @@ async function getDatabaseSchema() {
 
       Promise.all(tablePromises)
         .then(() => {
-          cachedSchema = schema;
+          if (!useUserData) cachedSchema = schema;
           resolve(schema);
         })
         .catch(reject);
@@ -57,7 +68,8 @@ async function getDatabaseSchema() {
 }
 
 // Helper function to execute SQL queries
-function executeQuery(query) {
+function executeQuery(query, useUserData) {
+  const db = getActiveDb(useUserData);
   return new Promise((resolve, reject) => {
     console.log('Executing query:', query);
     db.all(query, [], (err, rows) => {
@@ -103,23 +115,93 @@ function cleanSqlQuery(query) {
   return cleanedQuery;
 }
 
-// Determine best visualization type
-function determineVisualizationType(data) {
-  if (!data || data.length === 0) return 'table';
+// Determine visualization type and axis labels
+function determineVisualizationTypeAndLabels(data, question) {
+  if (!data || data.length === 0) return { type: 'table', xAxis: null, yAxis: null };
   
   const columns = Object.keys(data[0] || {});
   if (columns.length === 2) {
     const secondCol = data[0][columns[1]];
     if (typeof secondCol === 'number') {
-      return columns[0].toLowerCase().includes('date') ? 'line' : 'bar';
+      const isTimeSeries = columns[0].toLowerCase().includes('date') || columns[0].toLowerCase().includes('month');
+      return {
+        type: isTimeSeries ? 'line' : 'bar',
+        xAxis: isTimeSeries ? 'Date' : columns[0].charAt(0).toUpperCase() + columns[0].slice(1),
+        yAxis: columns[1].charAt(0).toUpperCase() + columns[1].slice(1)
+      };
     }
   }
-  return 'table';
+  return { type: 'table', xAxis: null, yAxis: null };
 }
+
+// API endpoint to upload CSV (unchanged)
+app.post('/api/upload-csv', (req, res) => {
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
+  req.on('end', async () => {
+    try {
+      const csvData = Buffer.concat(chunks).toString();
+      const records = await new Promise((resolve, reject) => {
+        parse(csvData, { columns: true, skip_empty_lines: true }, (err, output) => {
+          if (err) reject(err);
+          else resolve(output);
+        });
+      });
+
+      if (records.length === 0) {
+        return res.status(400).json({ error: 'CSV file is empty' });
+      }
+
+      if (tempDb) {
+        tempDb.close();
+      }
+
+      tempDb = new sqlite3.Database(':memory:', (err) => {
+        if (err) {
+          console.error('Temp database connection error:', err.message);
+          return res.status(500).json({ error: 'Failed to create temp database' });
+        }
+      });
+
+      const headers = Object.keys(records[0]);
+      const columns = headers.map(header => {
+        const cleanHeader = header.replace(/[^a-zA-Z0-9_]/g, '_');
+        return `${cleanHeader} TEXT`;
+      }).join(', ');
+      const createTableQuery = `CREATE TABLE user_data (${columns})`;
+      await new Promise((resolve, reject) => {
+        tempDb.run(createTableQuery, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const placeholders = headers.map(() => '?').join(', ');
+      const insertQuery = `INSERT INTO user_data (${headers.map(h => h.replace(/[^a-zA-Z0-9_]/g, '_')).join(', ')}) VALUES (${placeholders})`;
+      for (const record of records) {
+        const values = headers.map(header => record[header] || null);
+        await new Promise((resolve, reject) => {
+          tempDb.run(insertQuery, values, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+
+      const schema = await getDatabaseSchema(true);
+      console.log('Schema of uploaded dataset:', schema);
+
+      res.json({ message: 'CSV uploaded and processed successfully' });
+    } catch (error) {
+      console.error('Error processing CSV:', error.message);
+      res.status(500).json({ error: 'Failed to process CSV: ' + error.message });
+    }
+  });
+});
 
 // API endpoint to handle natural language queries
 app.post('/api/query', async (req, res) => {
-  const { question } = req.body;
+  const { question, useUserData = false } = req.body;
   
   if (!question) {
     return res.status(400).json({ error: 'Question is required' });
@@ -130,54 +212,43 @@ app.post('/api/query', async (req, res) => {
 
     // Step 1: Get schema
     console.log('Fetching database schema...');
-    const schema = await getDatabaseSchema();
+    const schema = await getDatabaseSchema(useUserData);
     console.log('Schema retrieved:', schema);
 
     // Step 2: Generate SQL with Ollama
     console.log('Generating SQL query with Ollama...');
     const sqlPrompt = `
-      You are a SQL expert. Given this database schema:
+      You are an intelligent SQL agent capable of dynamically analyzing database schemas and generating accurate SQL queries for any dataset. Given this database schema:
       ${schema}
       
       Generate a SQL query to answer: "${question}"
       Return ONLY the raw SQL query as a plain string, without any Markdown formatting (e.g., no \`\`\`sql or \`\`\`), comments, or additional text.
       Use lowercase for SQL functions (e.g., strftime, not STRFTIME).
-      Note: For sales status, use 'shipped' to indicate completed transactions.
-      Handle inconsistencies in the schema, such as unnamed columns (e.g., col1 in items table for item name) or mismatched column names (e.g., custid in sales vs client_id in clients).
-      ONLY use the tables and columns specified in the schema above. Do NOT invent tables or columns. Here are some example queries:
       
-      Example 1: To find the top clients by sales amount:
-      SELECT c.client_name, SUM(s.amt) AS total_spend
-      FROM clients c
-      JOIN sales s ON c.client_id = s.custid
-      WHERE s.date_of_sale LIKE '2023%'
-        AND s.status_code = 'shipped'
-      GROUP BY c.client_id, c.client_name
-      ORDER BY total_spend DESC
+      Follow these steps to reason like a real-time AI agent:
+      1. Analyze the schema to identify available tables and columns.
+      2. Determine the minimal set of columns needed to answer the question.
+      3. If a field mentioned in the question (e.g., 'location') doesn't exist, ignore that condition and proceed with available fields.
+      4. Do NOT invent tables (e.g., 'category_data') or columns that aren't in the schema.
+      5. Handle case sensitivity by using LOWER() for comparisons if needed.
+      6. Exclude invalid dates (e.g., '2023-13-01') using conditions like date_of_sale NOT LIKE '%-13-%' if 'date_of_sale' exists.
+      7. Handle missing values with IS NOT NULL or COALESCE where appropriate.
+      8. If fields like 'status_code' or 'client_location' are referenced in the question but don't exist, skip those conditions.
+      
+      Example 1: For a question like "Who are our top 5 clients by total sales?" on a schema with 'client_name' and 'total_amount':
+      SELECT client_name AS name, SUM(total_amount) AS total
+      FROM user_data
+      GROUP BY client_name
+      ORDER BY total DESC
       LIMIT 5
       
-      Example 2: To find monthly sales trends for a category:
-      SELECT strftime('%Y-%m', s.date_of_sale) AS sales_month, SUM(s.amt) AS total_revenue
-      FROM sales s
-      JOIN sale_items si ON s.sale_id = si.sale_ref
-      JOIN items i ON si.item_ref = i.item_id
-      JOIN categories c ON i.category_id_ref = c.cat_id
-      WHERE s.date_of_sale LIKE '2023%'
-        AND (c.cat_name = 'Necklaces' OR c.cat_name = 'necklaces')
-        AND s.status_code = 'shipped'
-      GROUP BY sales_month
-      ORDER BY sales_month
-      
-      Example 3: To find items with the highest return rate:
-      SELECT i.col1 AS item_name,
-             SUM(CASE WHEN s.status_code = 'returned' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) AS return_rate
-      FROM sales s
-      JOIN sale_items si ON s.sale_id = si.sale_ref
-      JOIN items i ON si.item_ref = i.item_id
-      WHERE s.date_of_sale LIKE '2023%'
-      GROUP BY i.item_id, i.col1
-      ORDER BY return_rate DESC
-      LIMIT 5
+      Example 2: For a question like "What is the sales trend in 2023?" if 'date_of_sale' exists:
+      SELECT strftime('%Y-%m', date_of_sale) AS month, SUM(total_amount) AS total
+      FROM user_data
+      WHERE date_of_sale LIKE '2023%'
+        AND date_of_sale NOT LIKE '%-13-%'
+      GROUP BY month
+      ORDER BY month
     `;
     
     const sqlQuery = await generateWithOllama(sqlPrompt);
@@ -187,7 +258,7 @@ app.post('/api/query', async (req, res) => {
 
     // Step 3: Execute query
     console.log('Executing SQL query...');
-    const data = await executeQuery(cleanedSqlQuery);
+    const data = await executeQuery(cleanedSqlQuery, useUserData);
     console.log('Query results:', data);
 
     // Step 4: Generate explanation with Ollama
@@ -197,21 +268,30 @@ app.post('/api/query', async (req, res) => {
       SQL Query: ${cleanedSqlQuery}
       Query Results (first 3 rows): ${JSON.stringify(data.slice(0, 3))}
       
-      Explain these results in business terms in 1 short paragraph (50-100 words).
-      Highlight key insights and trends.
-      Account for potential data issues (e.g., missing values, outliers) in the explanation.
+      You're a business advisor! Share insights in a lively, actionable format using bullet points (3-5 points, each 10-20 words).
+      - Start with a positive hook (e.g., "Great news!").
+      - Highlight key trends and standout performers.
+      - Suggest a bold, actionable step to capitalize on the data.
+      - Note any data quirks (e.g., missing fields, outliers) with a curious tone.
+      - Keep it conversational and exciting!
+      If fields like 'location' were unavailable, mention the analysis was adjusted.
     `;
     
     const explanation = await generateWithOllama(explanationPrompt);
     console.log('Explanation generated:', explanation);
 
-    // Step 5: Send response
+    // Step 5: Determine visualization type and axis labels
+    const vizInfo = determineVisualizationTypeAndLabels(data, question);
+
+    // Step 6: Send response
     res.json({
       question,
       sqlQuery: cleanedSqlQuery,
       data,
       explanation,
-      visualizationType: determineVisualizationType(data)
+      visualizationType: vizInfo.type,
+      xAxisLabel: vizInfo.xAxis,
+      yAxisLabel: vizInfo.yAxis
     });
     
   } catch (error) {

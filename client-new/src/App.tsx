@@ -1,17 +1,17 @@
-import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar.jsx';
-import Onboarding from './pages/Onboarding';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './Pages/Home';
 import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-900">
-      <Navbar />
+    <Router>
       <Routes>
-        <Route path="/" element={<Onboarding />} />
+        <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
-    </div>
+    </Router>
   );
 }
 
