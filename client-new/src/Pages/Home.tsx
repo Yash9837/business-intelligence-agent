@@ -13,7 +13,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20">
           <div className="text-center">
             <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500">
-              Welcome to Silver Insights
+              Welcome to Insights.AI
             </h1>
             <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto leading-relaxed">
               Transform your e-commerce data into strategic advantage. Analyze sales trends, 
@@ -145,7 +145,7 @@ const Home: React.FC = () => {
       <footer className="bg-gray-900 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-400 text-sm">
-            <p>© 2025 Silver Insights. All rights reserved.</p>
+            <p>© 2025 Insights.AI. All rights reserved.</p>
           </div>
         </div>
       </footer>

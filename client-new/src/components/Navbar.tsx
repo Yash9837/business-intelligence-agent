@@ -6,7 +6,7 @@ const Navbar: React.FC = () => {
     <nav className="bg-gray-800 p-4 shadow-lg">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <Link to="/" className="text-2xl font-bold text-blue-300">
-          Silver Insights
+          Insights.AI
         </Link>
         <div className="space-x-4">
           <Link to="/" className="text-gray-300 hover:text-blue-300">

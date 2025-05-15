@@ -155,7 +155,7 @@ const Dashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
             <div>
               <h1 className="welcome-text text-4xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500">
-                Silver Insights Dashboard
+                Insights.AI Dashboard
               </h1>
               <p className="text-gray-300">Ask questions and discover insights from your data</p>
             </div>
