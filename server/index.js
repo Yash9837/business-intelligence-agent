@@ -2,15 +2,26 @@ require('dotenv').config();
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const multer = require('multer');
 const { parse } = require('csv-parse');
 const fs = require('fs');
+const axios = require('axios');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+const upload = multer({ dest: 'uploads/' });
 
-// Initialize default database
-const defaultDb = new sqlite3.Database('./data/ecommerce_db_v2.sqlite', (err) => {
+app.use(express.json());
+app.use(cors({
+  origin: 'https://intelligence-agent.netlify.app',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type'],
+}));
+
+const XAI_API_KEY = process.env.XAI_API_KEY;
+const XAI_API_URL = 'https://api.x.ai/v1/generate';
+
+// Initialize default database on Render disk
+const defaultDb = new sqlite3.Database('/opt/render/db/ecommerce_db_v2.sqlite', (err) => {
   if (err) {
     console.error('Default database connection error:', err.message);
   } else {
@@ -82,28 +93,22 @@ function executeQuery(query, useUserData) {
   });
 }
 
-// Helper function to generate responses with Ollama
-async function generateWithOllama(prompt) {
+// Helper function to generate responses with xAI API
+async function generateWithXAI(prompt) {
   try {
-    const response = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
+    const response = await axios.post(XAI_API_URL, {
+      prompt: prompt,
+      model: 'grok',
+    }, {
       headers: {
+        Authorization: `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gemma:2b',
-        prompt: prompt,
-        stream: false,
-      }),
     });
-    if (!response.ok) {
-      throw new Error(`Ollama API request failed: ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.response;
+    return response.data.response;
   } catch (error) {
-    console.error("Ollama Error Details:", error);
-    throw new Error(`Failed to generate response from Ollama: ${error.message}`);
+    console.error("xAI API Error Details:", error);
+    throw new Error(`Failed to generate response from xAI API: ${error.message}`);
   }
 }
 
@@ -127,76 +132,80 @@ function determineVisualizationTypeAndLabels(data, question) {
       return {
         type: isTimeSeries ? 'line' : 'bar',
         xAxis: isTimeSeries ? 'Date' : columns[0].charAt(0).toUpperCase() + columns[0].slice(1),
-        yAxis: columns[1].charAt(0).toUpperCase() + columns[1].slice(1)
+        yAxis: columns[1].charAt(0).toUpperCase() + columns[1].slice(1),
       };
     }
   }
   return { type: 'table', xAxis: null, yAxis: null };
 }
 
-// API endpoint to upload CSV (unchanged)
-app.post('/api/upload-csv', (req, res) => {
-  const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', async () => {
-    try {
-      const csvData = Buffer.concat(chunks).toString();
-      const records = await new Promise((resolve, reject) => {
-        parse(csvData, { columns: true, skip_empty_lines: true }, (err, output) => {
-          if (err) reject(err);
-          else resolve(output);
-        });
-      });
+// API endpoint to upload CSV
+app.post('/api/upload-csv', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
 
-      if (records.length === 0) {
-        return res.status(400).json({ error: 'CSV file is empty' });
+  try {
+    const records = await new Promise((resolve, reject) => {
+      const results = [];
+      fs.createReadStream(req.file.path)
+        .pipe(parse({ delimiter: ',', columns: true, skip_empty_lines: true }))
+        .on('data', (row) => results.push(row))
+        .on('end', () => {
+          fs.unlinkSync(req.file.path);
+          resolve(results);
+        })
+        .on('error', (err) => reject(err));
+    });
+
+    if (records.length === 0) {
+      return res.status(400).json({ error: 'CSV file is empty' });
+    }
+
+    if (tempDb) {
+      tempDb.close();
+    }
+
+    tempDb = new sqlite3.Database(':memory:', (err) => {
+      if (err) {
+        console.error('Temp database connection error:', err.message);
+        return res.status(500).json({ error: 'Failed to create temp database' });
       }
+    });
 
-      if (tempDb) {
-        tempDb.close();
-      }
-
-      tempDb = new sqlite3.Database(':memory:', (err) => {
-        if (err) {
-          console.error('Temp database connection error:', err.message);
-          return res.status(500).json({ error: 'Failed to create temp database' });
-        }
+    const headers = Object.keys(records[0]);
+    const columns = headers.map(header => {
+      const cleanHeader = header.replace(/[^a-zA-Z0-9_]/g, '_');
+      return `${cleanHeader} TEXT`;
+    }).join(', ');
+    const createTableQuery = `CREATE TABLE user_data (${columns})`;
+    await new Promise((resolve, reject) => {
+      tempDb.run(createTableQuery, (err) => {
+        if (err) reject(err);
+        else resolve();
       });
+    });
 
-      const headers = Object.keys(records[0]);
-      const columns = headers.map(header => {
-        const cleanHeader = header.replace(/[^a-zA-Z0-9_]/g, '_');
-        return `${cleanHeader} TEXT`;
-      }).join(', ');
-      const createTableQuery = `CREATE TABLE user_data (${columns})`;
+    const placeholders = headers.map(() => '?').join(', ');
+    const insertQuery = `INSERT INTO user_data (${headers.map(h => h.replace(/[^a-zA-Z0-9_]/g, '_')).join(', ')}) VALUES (${placeholders})`;
+    for (const record of records) {
+      const values = headers.map(header => record[header] || null);
       await new Promise((resolve, reject) => {
-        tempDb.run(createTableQuery, (err) => {
+        tempDb.run(insertQuery, values, (err) => {
           if (err) reject(err);
           else resolve();
         });
       });
-
-      const placeholders = headers.map(() => '?').join(', ');
-      const insertQuery = `INSERT INTO user_data (${headers.map(h => h.replace(/[^a-zA-Z0-9_]/g, '_')).join(', ')}) VALUES (${placeholders})`;
-      for (const record of records) {
-        const values = headers.map(header => record[header] || null);
-        await new Promise((resolve, reject) => {
-          tempDb.run(insertQuery, values, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-      }
-
-      const schema = await getDatabaseSchema(true);
-      console.log('Schema of uploaded dataset:', schema);
-
-      res.json({ message: 'CSV uploaded and processed successfully' });
-    } catch (error) {
-      console.error('Error processing CSV:', error.message);
-      res.status(500).json({ error: 'Failed to process CSV: ' + error.message });
     }
-  });
+
+    const schema = await getDatabaseSchema(true);
+    console.log('Schema of uploaded dataset:', schema);
+
+    res.json({ message: 'CSV uploaded and processed successfully' });
+  } catch (error) {
+    console.error('Error processing CSV:', error.message);
+    res.status(500).json({ error: 'Failed to process CSV: ' + error.message });
+  }
 });
 
 // API endpoint to handle natural language queries
@@ -215,8 +224,8 @@ app.post('/api/query', async (req, res) => {
     const schema = await getDatabaseSchema(useUserData);
     console.log('Schema retrieved:', schema);
 
-    // Step 2: Generate SQL with Ollama
-    console.log('Generating SQL query with Ollama...');
+    // Step 2: Generate SQL with xAI API
+    console.log('Generating SQL query with xAI API...');
     const sqlPrompt = `
       You are an intelligent SQL agent capable of dynamically analyzing database schemas and generating accurate SQL queries for any dataset. Given this database schema:
       ${schema}
@@ -251,7 +260,7 @@ app.post('/api/query', async (req, res) => {
       ORDER BY month
     `;
     
-    const sqlQuery = await generateWithOllama(sqlPrompt);
+    const sqlQuery = await generateWithXAI(sqlPrompt);
     console.log('Generated SQL query (before cleaning):', sqlQuery);
     const cleanedSqlQuery = cleanSqlQuery(sqlQuery);
     console.log('Cleaned SQL query:', cleanedSqlQuery);
@@ -261,8 +270,8 @@ app.post('/api/query', async (req, res) => {
     const data = await executeQuery(cleanedSqlQuery, useUserData);
     console.log('Query results:', data);
 
-    // Step 4: Generate explanation with Ollama
-    console.log('Generating explanation with Ollama...');
+    // Step 4: Generate explanation with xAI API
+    console.log('Generating explanation with xAI API...');
     const explanationPrompt = `
       Question: ${question}
       SQL Query: ${cleanedSqlQuery}
@@ -277,7 +286,7 @@ app.post('/api/query', async (req, res) => {
       If fields like 'location' were unavailable, mention the analysis was adjusted.
     `;
     
-    const explanation = await generateWithOllama(explanationPrompt);
+    const explanation = await generateWithXAI(explanationPrompt);
     console.log('Explanation generated:', explanation);
 
     // Step 5: Determine visualization type and axis labels
@@ -291,20 +300,27 @@ app.post('/api/query', async (req, res) => {
       explanation,
       visualizationType: vizInfo.type,
       xAxisLabel: vizInfo.xAxis,
-      yAxisLabel: vizInfo.yAxis
+      yAxisLabel: vizInfo.yAxis,
     });
     
   } catch (error) {
     console.error("Error in /api/query:", error.message, error.stack);
     res.status(500).json({ 
       error: error.message,
-      details: error.stack 
+      details: error.stack,
     });
   }
 });
 
 // Start server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+// Close databases on shutdown
+process.on('SIGINT', () => {
+  if (tempDb) tempDb.close();
+  defaultDb.close();
+  process.exit();
 });

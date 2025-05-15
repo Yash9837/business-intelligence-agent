@@ -13,6 +13,8 @@ interface PastQuery {
   timestamp: string;
 }
 
+const API_BASE_URL = 'https://intelligence-agent.onrender.com';
+
 const Dashboard: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [useUploadedData, setUseUploadedData] = useState<boolean>(false);
@@ -52,12 +54,9 @@ const Dashboard: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('http://localhost:3001/api/upload-csv', {
+      const response = await fetch(`${API_BASE_URL}/api/upload-csv`, {
         method: 'POST',
-        body: file,
-        headers: {
-          'Content-Type': 'text/csv'
-        }
+        body: formData,
       });
 
       const data = await response.json();
@@ -69,7 +68,7 @@ const Dashboard: React.FC = () => {
       }
     } catch (err) {
       const error = err as Error;
-      setError('Error uploading CSV: ' + error.message);
+      setError('Error uploading CSV: ' + (error.message || 'Network error'));
     } finally {
       setUploadLoading(false);
     }
@@ -87,21 +86,21 @@ const Dashboard: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://localhost:3001/api/query', {
+      const response = await fetch(`${API_BASE_URL}/api/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           question,
-          useUserData: useUploadedData
+          useUserData: useUploadedData,
         }),
       });
 
       const data = await response.json();
       if (response.ok) {
         setResult(data);
-        setPastQueries(prev => {
+        setPastQueries((prev) => {
           const newQueries = [{ question, timestamp: new Date().toISOString() }, ...prev];
           return newQueries.slice(0, 5);
         });
@@ -110,7 +109,7 @@ const Dashboard: React.FC = () => {
       }
     } catch (err) {
       const error = err as Error;
-      setError('Error fetching query results: ' + error.message);
+      setError('Error fetching query results: ' + (error.message || 'Network error'));
     } finally {
       setLoading(false);
     }
@@ -125,13 +124,13 @@ const Dashboard: React.FC = () => {
       return [
         "What are the top items in my dataset?",
         "Show me trends over time if dates are available",
-        "Find outliers in my numerical columns"
+        "Find outliers in my numerical columns",
       ];
     } else {
       return [
         "Who are our top 5 clients by total sales?",
         "What is the revenue trend by month in 2023?",
-        "Which product category has the highest profit margin?"
+        "Which product category has the highest profit margin?",
       ];
     }
   };
@@ -140,9 +139,11 @@ const Dashboard: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       <Navbar />
       {notification && (
-        <div className={`fixed top-20 right-4 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-0 z-50 ${
-          notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-        }`}>
+        <div
+          className={`fixed top-20 right-4 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-0 z-50 ${
+            notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          }`}
+        >
           <p className="text-white font-medium">{notification.message}</p>
         </div>
       )}
@@ -157,14 +158,22 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="mt-4 sm:mt-0">
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm inline-flex shadow-md">
-              <button 
-                className={`px-4 py-2 rounded-md transition duration-200 ${!useUploadedData ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md' : 'text-gray-300 hover:text-white'}`}
+              <button
+                className={`px-4 py-2 rounded-md transition duration-200 ${
+                  !useUploadedData
+                    ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
+                    : 'text-gray-300 hover:text-white'
+                }`}
                 onClick={() => setUseUploadedData(false)}
               >
                 Sample Data
               </button>
-              <button 
-                className={`px-4 py-2 rounded-md transition duration-200 ${useUploadedData ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md' : 'text-gray-300 hover:text-white'}`}
+              <button
+                className={`px-4 py-2 rounded-md transition duration-200 ${
+                  useUploadedData
+                    ? 'bg-gradient-to-r from-blue-500 to-emerald-500 text-white shadow-md'
+                    : 'text-gray-300 hover:text-white'
+                }`}
                 onClick={() => setUseUploadedData(true)}
               >
                 My Data
@@ -182,21 +191,23 @@ const Dashboard: React.FC = () => {
                     <FileText className="h-5 w-5 mr-2 text-blue-400" />
                     Data Source
                   </h2>
-                  <button 
+                  <button
                     onClick={() => setShowDatasetInfo(!showDatasetInfo)}
                     className="text-gray-400 hover:text-white transition"
                   >
-                    <ChevronDown className={`h-5 w-5 transform ${showDatasetInfo ? 'rotate-180' : ''} transition-transform`} />
+                    <ChevronDown
+                      className={`h-5 w-5 transform ${showDatasetInfo ? 'rotate-180' : ''} transition-transform`}
+                    />
                   </button>
                 </div>
               </div>
-              
+
               {showDatasetInfo && (
                 <div className="px-5 py-3 bg-gray-750 border-b border-gray-700 text-sm text-gray-300">
                   <p>Upload a CSV file to analyze your own data or use our sample dataset to explore the platform's capabilities.</p>
                 </div>
               )}
-              
+
               <div className="p-5">
                 <form onSubmit={handleUpload} className="space-y-4">
                   <div className="border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-blue-400 transition cursor-pointer">
@@ -344,7 +355,7 @@ const Dashboard: React.FC = () => {
                       <Send className="h-5 w-5 text-white" />
                     </button>
                   </div>
-                  
+
                   <div className="flex items-center text-sm text-gray-400">
                     <Info className="h-4 w-4 mr-1" />
                     <span>Ask in natural language about your data</span>
