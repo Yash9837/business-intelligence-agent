@@ -17,8 +17,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type'],
 }));
 
-const XAI_API_KEY = process.env.XAI_API_KEY;
-const XAI_API_URL = 'https://api.x.ai/v1/generate';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`;
 
 // Initialize default database on Render disk
 const defaultDb = new sqlite3.Database('/opt/render/db/ecommerce_db_v2.sqlite', (err) => {
@@ -93,22 +93,39 @@ function executeQuery(query, useUserData) {
   });
 }
 
-// Helper function to generate responses with xAI API
-async function generateWithXAI(prompt) {
+// Helper function to generate responses with Gemini API
+async function generateWithGemini(prompt) {
   try {
-    const response = await axios.post(XAI_API_URL, {
-      prompt: prompt,
-      model: 'grok',
+    const response = await axios.post(GEMINI_API_URL, {
+      contents: [
+        {
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ]
     }, {
       headers: {
-        Authorization: `Bearer ${XAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      timeout: 30000, // 30-second timeout
     });
-    return response.data.response;
+
+    if (!response.data || !response.data.candidates || !response.data.candidates[0].content.parts[0].text) {
+      throw new Error('Invalid response from Gemini API');
+    }
+
+    return response.data.candidates[0].content.parts[0].text;
   } catch (error) {
-    console.error("xAI API Error Details:", error);
-    throw new Error(`Failed to generate response from xAI API: ${error.message}`);
+    if (error.response && error.response.status === 429) {
+      throw new Error('Gemini API rate limit exceeded. Please wait and try again or upgrade your plan.');
+    } else if (error.response && error.response.status === 401) {
+      throw new Error('Invalid Gemini API key. Please check your GEMINI_API_KEY environment variable.');
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error('Gemini API request timed out. Please try again later.');
+    }
+    console.error("Gemini API Error Details:", error.response ? error.response.data : error);
+    throw new Error(`Failed to generate response from Gemini API: ${error.message}`);
   }
 }
 
@@ -224,8 +241,8 @@ app.post('/api/query', async (req, res) => {
     const schema = await getDatabaseSchema(useUserData);
     console.log('Schema retrieved:', schema);
 
-    // Step 2: Generate SQL with xAI API
-    console.log('Generating SQL query with xAI API...');
+    // Step 2: Generate SQL with Gemini API
+    console.log('Generating SQL query with Gemini API...');
     const sqlPrompt = `
       You are an intelligent SQL agent capable of dynamically analyzing database schemas and generating accurate SQL queries for any dataset. Given this database schema:
       ${schema}
@@ -260,7 +277,7 @@ app.post('/api/query', async (req, res) => {
       ORDER BY month
     `;
     
-    const sqlQuery = await generateWithXAI(sqlPrompt);
+    const sqlQuery = await generateWithGemini(sqlPrompt);
     console.log('Generated SQL query (before cleaning):', sqlQuery);
     const cleanedSqlQuery = cleanSqlQuery(sqlQuery);
     console.log('Cleaned SQL query:', cleanedSqlQuery);
@@ -270,8 +287,8 @@ app.post('/api/query', async (req, res) => {
     const data = await executeQuery(cleanedSqlQuery, useUserData);
     console.log('Query results:', data);
 
-    // Step 4: Generate explanation with xAI API
-    console.log('Generating explanation with xAI API...');
+    // Step 4: Generate explanation with Gemini API
+    console.log('Generating explanation with Gemini API...');
     const explanationPrompt = `
       Question: ${question}
       SQL Query: ${cleanedSqlQuery}
@@ -286,7 +303,7 @@ app.post('/api/query', async (req, res) => {
       If fields like 'location' were unavailable, mention the analysis was adjusted.
     `;
     
-    const explanation = await generateWithXAI(explanationPrompt);
+    const explanation = await generateWithGemini(explanationPrompt);
     console.log('Explanation generated:', explanation);
 
     // Step 5: Determine visualization type and axis labels
